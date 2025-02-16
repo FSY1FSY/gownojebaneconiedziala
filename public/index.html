@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Czat na żywo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f1f2f6;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            height: 90vh;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Panel z użytkownikami */
+        .user-list-container {
+            width: 250px;
+            background-color: #ffffff;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .user-list-container h4 {
+            margin: 0 0 15px;
+            font-size: 18px;
+        }
+
+        .user-list ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .user-list li {
+            padding: 8px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        /* Header */
+        .header {
+            background-color: #0078FF;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 500;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+
+        /* Messages Section */
+        #messages {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+            max-height: 75vh;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.sender {
+            background-color: #0078FF;
+            color: white;
+            align-self: flex-start;
+            text-align: left;
+        }
+
+        .message.receiver {
+            background-color: #e4e6eb;
+            color: #1d1f20;
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        .message .username {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .message .timestamp {
+            font-size: 12px;
+            color: #999;
+            text-align: right;
+            margin-top: 5px;
+        }
+
+        /* Input Section */
+        .input-container {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: white;
+            border-top: 1px solid #ddd;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            background-color: #f1f2f6;
+        }
+
+        #send-button {
+            background-color: #0078FF;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        #send-button:hover {
+            background-color: #0069d9;
+        }
+
+        /* Username and errors */
+        .username-section {
+            display: flex;
+            justify-content: center;
+            margin-top: 50px;
+        }
+
+        #username {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+        }
+
+        #set-username-button {
+            padding: 10px 20px;
+            background-color: #0078FF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #set-username-button:hover {
+            background-color: #0069d9;
+        }
+
+        #username-error {
+            color: red;
+            font-size: 14px;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Panel użytkowników -->
+        <div class="user-list-container">
+            <h4>Online:</h4>
+            <ul id="user-list"></ul>
+        </div>
+
+        <!-- Czat -->
+        <div id="chat" class="chat-container" style="display:none;">
+            <div class="header">Czat na żywo</div>
+            <div id="messages"></div>
+            <div class="input-container">
+                <input type="text" id="message-input" placeholder="Wpisz wiadomość...">
+                <button id="send-button">➤</button>
+            </div>
+        </div>
+
+        <!-- Panel ustawiania nazwy użytkownika -->
+        <div id="username-section" class="username-section" style="display: block;">
+            <input type="text" id="username" placeholder="Wpisz swoją nazwę użytkownika">
+            <button id="set-username-button">Ustaw nazwę</button>
+        </div>
+
+        <div id="username-error" style="color: red;"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // Ustawianie nazwy użytkownika
+        document.getElementById('set-username-button').addEventListener('click', () => {
+            const username = document.getElementById('username').value.trim();
+            if (username) {
+                socket.emit('setUsername', username);
+            } else {
+                document.getElementById('username-error').textContent = "Nazwa użytkownika nie może być pusta.";
+            }
+        });
+
+        // Odbieranie błędu ustawienia nazwy użytkownika
+        socket.on('usernameError', (message) => {
+            document.getElementById('username-error').textContent = message;
+        });
+
+        // Odbieranie informacji o ustawieniu nazwy
+        socket.on('usernameSet', (username) => {
+            document.getElementById('username-section').style.display = 'none';
+            document.getElementById('chat').style.display = 'flex';
+        });
+
+        // Odbieranie historii wiadomości
+        socket.on('loadHistory', (history) => {
+            const messagesDiv = document.getElementById('messages');
+            history.forEach((msg) => {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.textContent = msg;
+                messagesDiv.appendChild(messageElement);
+            });
+        });
+
+        // Odbieranie nowych wiadomości
+        socket.on('receiveMessage', (message) => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            
+            // Dodajemy nazwę użytkownika
+            const usernameElement = document.createElement('div');
+            usernameElement.classList.add('username');
+            usernameElement.textContent = message.username;
+            messageElement.appendChild(usernameElement);
+
+            // Dodajemy treść wiadomości
+            const messageText = document.createElement('div');
+            messageText.textContent = message.text;
+            messageElement.appendChild(messageText);
+
+            // Jeśli wiadomość jest wysłana przez użytkownika, dodajemy klasę 'sender'
+            if (message.username === document.getElementById('username').value.trim()) {
+                messageElement.classList.add('sender');
+                messageElement.style.backgroundColor = '#0078FF';  // Niebieska wiadomość
+                messageElement.style.color = 'white';  // Białe litery
+            } else {
+                messageElement.classList.add('receiver');
+                messageElement.style.backgroundColor = '#e4e6eb'; // Szara wiadomość
+                messageElement.style.color = '#1d1f20'; // Czarny tekst
+            }
+
+            // Dodajemy znacznik czasowy
+            const timestamp = document.createElement('div');
+            timestamp.classList.add('timestamp');
+            timestamp.textContent = message.timestamp;
+
+            messageElement.appendChild(timestamp);
+            document.getElementById('messages').appendChild(messageElement);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;  // Scroll to bottom
+        });
+
+        // Odbieranie listy użytkowników
+        socket.on('updateUserList', (users) => {
+            const userListElement = document.getElementById('user-list');
+            userListElement.innerHTML = '';  // Clear previous list
+            users.forEach((user) => {
+                const userItem = document.createElement('li');
+                userItem.textContent = user;
+                userListElement.appendChild(userItem);
+            });
+        });
+
+        // Wysyłanie wiadomości za pomocą przycisku
+        document.getElementById('send-button').addEventListener('click', () => {
+            const text = document.getElementById('message-input').value.trim();
+            if (text) {
+                socket.emit('sendMessage', { text });
+                document.getElementById('message-input').value = '';
+            }
+        });
+
+        // Wysyłanie wiadomości za pomocą klawisza "Enter"
+        document.getElementById('message-input').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && event.target.value.trim() !== '') {
+                event.preventDefault(); // Zapobiega domyślnej akcji (np. nowa linia)
+                const text = event.target.value.trim();
+                socket.emit('sendMessage', { text }); // Wysyłanie wiadomości
+                event.target.value = ''; // Czyszczenie pola input
+            }
+        });
+    </script>
+</body>
+</html>
